@@ -15,67 +15,65 @@ use Intervention\Image\ImageManager;
 
 class FeedController extends BaseController
 {
-        private $loggerUser;
         public function __construct()
         {
             $this->middleware('auth:api');
 
-            $this->loggerUser = Auth::user();
         }
 
         public function create(Request $request) {
-        $user = User::find(Auth::id());
+            $user = User::find(Auth::id());
 
-        $validated = $request->validate([
-            'type'  => 'required|string|max:255',
-            'body'  => 'nullable|string|max:255',
-            'photo' => 'nullable|file|image|max:2048', // validação de foto
-        ]);
+            $validated = $request->validate([
+                'type'  => 'required|string|max:255',
+                'body'  => 'nullable|string|max:255',
+                'photo' => 'nullable|file|image|max:2048', // validação de foto
+            ]);
 
-        switch ($validated['type']) {
-            case 'text':
-                if (empty($validated['body'])) {
-                    return ['error' => 'Texto não enviado'];
-                }
-                break;
+            switch ($validated['type']) {
+                case 'text':
+                    if (empty($validated['body'])) {
+                        return ['error' => 'Texto não enviado'];
+                    }
+                    break;
 
-            case 'photo':
-                if (!$request->hasFile('photo')) {
-                    return ['error' => 'Foto não enviada'];
-                }
-                break;
+                case 'photo':
+                    if (!$request->hasFile('photo')) {
+                        return ['error' => 'Foto não enviada'];
+                    }
+                    break;
 
-            default:
-                return ['error' => 'Tipo de postagem inexistente'];
-        }
+                default:
+                    return ['error' => 'Tipo de postagem inexistente'];
+            }
 
-        $newPost = new Post();
-        $newPost->id_user = $user->id; // salva apenas o ID
-        $newPost->type = $validated['type'];
-        $newPost->created_at = now();
+            $newPost = new Post();
+            $newPost->id_user = $user->id; // salva apenas o ID
+            $newPost->type = $validated['type'];
+            $newPost->created_at = now();
 
-        if (!empty($validated['body'])) {
-            $newPost->body = $validated['body'];
-        }
+            if (!empty($validated['body'])) {
+                $newPost->body = $validated['body'];
+            }
 
-        if ($request->hasFile('photo')) {
-            $filename = md5(time().rand(0, 999)).'.jpg';
+            if ($request->hasFile('photo')) {
+                $filename = md5(time().rand(0, 999)).'.jpg';
 
-            $destPath = public_path("/media/uploads");
+                $destPath = public_path("/media/uploads");
 
-            $manager = ImageManager::usingDriver(new Driver());
-            $img = $manager->decode($validated['photo']->getRealPath())->save($destPath.'/'.$filename);
+                $manager = ImageManager::usingDriver(new Driver());
+                $img = $manager->decode($validated['photo']->getRealPath())->save($destPath.'/'.$filename);
 
-            $newPost->photo = $filename;
+                $newPost->photo = $filename;
 
-        }
+            }
 
-        $newPost->save();
+            $newPost->save();
 
-        return response()->json([
-            'message' => 'Post criado com sucesso',
-            'post'    => $newPost
-        ]);
+            return response()->json([
+                'message' => 'Post criado com sucesso',
+                'post'    => $newPost
+            ]);
     }
     public function read(Request $request){
         $userId = Auth::id();
@@ -105,6 +103,29 @@ class FeedController extends BaseController
         ];
     }
 
+    public function userFeed(Request $request, $id = false) {
+        $user = Auth::id();
+
+        if ($id === false) {
+            $id = $user;
+        }
+
+        $perPage = 2;
+        $page = intval($request->input('page'));
+
+        $postList = Post::where('id_user', $id)
+            ->orderBy('created_at', 'desc')
+            ->paginate($perPage, ['*'], 'page', $page);
+
+        $posts = $this->_postListToObject($postList->items(), $user);
+
+        return [
+            'posts' => $posts,
+            'pageCount' => $postList->lastPage(),
+            'currentPage' => $postList->currentPage()
+        ];
+    }
+
 
     private function _postListToObject(mixed $postList, int $loggedUser) {
         foreach($postList as $postKey => $postItem){
@@ -118,7 +139,7 @@ class FeedController extends BaseController
             $likes = PostLike::where('id_post', $postItem['id'])->count();
             $postLikes[$postKey]['likeCount'] = $likes;
 
-            $isLiked = PostLike::where('id_post', $postItem['id'])->where('id_user', $loggedUser)->count();
+            $isLiked = PostLike::where('id_post', $postItem['id'])->where('id_user', $loggedUser)->exists();
 
             $postList[$postKey]['liked'] = ($isLiked > 0) ? true : false;
 
@@ -135,6 +156,34 @@ class FeedController extends BaseController
         }
 
         return $postList;
+    }
+
+    public function userPhotos(Request $request, ?int $id = null) {
+        $userId = Auth::id();
+
+        // Se não passar ID, usa o do usuário autenticado
+        if ($id === null) {
+            $id = $userId;
+        }
+
+        $perPage = 2;
+
+        $postList = Post::where('id_user', $id)
+            ->where('type', 'photo')
+            ->orderBy('created_at', 'desc')
+            ->paginate($perPage);
+
+        $posts = $this->_postListToObject($postList->items(), $userId);
+
+        foreach($posts as $pkey) {
+            $posts[$pkey]['body'] = url('media/uploads/'.$posts[$pkey]['body']);
+        }
+
+        return [
+            'posts' => $posts,
+            'pageCount' => $postList->lastPage(),
+            'currentPage' => $postList->currentPage(),
+        ];
     }
 
 }

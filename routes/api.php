@@ -21,21 +21,24 @@ Route::put('/user', [UserController::class, 'update']);
 Route::post('/user/avatar', [UserController::class, 'updateAvatar']);
 Route::post('/user/cover', [UserController::class, 'updateCover']);
 
-// Route::get('/user', [UserController::class, 'read']);
-// Route::get('/user/{id}', [UserController::class, 'read']);
+Route::get('/user', [UserController::class, 'read']);
+Route::get('/user/{id}', [UserController::class, 'read']);
+Route::get('/user/{id}/follow', [UserController::class, 'follow']);
+Route::get('/user/{id}/followers', [UserController::class, 'followers']);
+Route::get('/user/{id}/photos', [FeedController::class, 'userPhotos']);
 
-// // Feed
+// Feed
 Route::get('/feed', [FeedController::class, 'read']);
-// Route::get('/user/feed', [FeedController::class, 'userFeed']);
-// Route::get('/user/{id}/feed', [FeedController::class, 'userFeed']);
+Route::get('/user/feed', [FeedController::class, 'userFeed']);
+Route::get('/user/{id}/feed', [FeedController::class, 'userFeed']);
 Route::post('/feed', [FeedController::class, 'create']);
 
-// // Post
-// Route::post('/post/{id}/like', [PostController::class, 'like']);
-// Route::post('/post/{id}/comment', [PostController::class, 'comment']);
+// Post
+Route::post('/post/{id}/like', [PostController::class, 'like']);
+Route::post('/post/{id}/comment', [PostController::class, 'comment']);
 
 // // Busca
-// Route::get('/search', [SearchController::class, 'search']);
+Route::get('/search', [SearchController::class, 'search']);
 
 
 

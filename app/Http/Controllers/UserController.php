@@ -2,7 +2,9 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Post;
 use App\Models\User;
+use App\Models\UserRelation;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -104,4 +106,89 @@ class UserController extends BaseController
         }
     }
 
+    public function read($id = false) {
+        $user = User::find(Auth::id());
+        if($id){
+            $info = User::find($id);
+            if(!$info) {
+                return['error' => 'Usuário inexistente!'];
+            }
+
+        }else{
+            $info = $user;
+            return ['data' => $info];
+        }
+
+        $info['avatar'] = url('media/avatars/'.$info['avatar']);
+        $info['cover'] = url('media/covers/'.$info['cover']);
+
+        $info['me'] = ($info['id'] == $user['id']) ?  true : false;
+
+        $dateFrom = new \DateTime($info['birthdate']);
+        $dateTo = new \DateTime('today');
+        $info['age'] = $dateFrom->diff($dateTo)->y;
+
+        $info['followers'] = UserRelation::where('user_to', $info['id'])->count();
+        $info['following'] = UserRelation::where('user_from', $info['id'])->count();
+       
+        $info['photoCount'] = Post::where('id_user', $info['id'])->where('type', 'photo')->count();
+
+        $hasRelation = UserRelation::where('user_from', $user['id'])->where('user_to', $info['id'])->count();
+        $info['isFollowing'] = ($hasRelation > 0) ? true : false;
+        return ['data' => $info];
+    }
+
+    public function follow(int $id) {
+        $user = User::find(Auth::id());
+        if($id == $user['id']){
+            return['error' => 'Você nãp pode seguir a si mesmo'];
+        }
+        $userExists = User::find($id);
+        if($userExists) {
+            $relation = UserRelation::where('user_from', $user['id'])->where('user_to', $id)->first();
+
+            if($relation) {
+                $relation->delete;
+            } else {
+                $newRelation = new UserRelation();
+                $newRelation->user_from = $user['id'];
+                $newRelation->user_to = $id;
+                $newRelation->save();
+            }
+        }
+        return ['error'=>''];
+    }
+
+    public function followers($id) {
+        $userExists = User::find($id);
+        if($userExists) {
+            $followers = UserRelation::where('user_to', $id)->get();
+            $following = UserRelation::where('user_from', $id)->get();
+
+            $array['followers'] = [];
+            $array['following'] = [];
+
+            foreach($followers as $item) {
+                $user = User::find($item['user_from']);
+                $array['followers'] = [
+                    'id' => $user['id'],
+                    'name' => $user['name'],
+                    'avatar' => url('media/avatars/'.$user['avatar']),
+                ];
+            } 
+            foreach($following as $item) {
+                $user = User::find($item['user_from']);
+                $array['following'] = [
+                    'id' => $user['id'],
+                    'name' => $user['name'],
+                    'avatar' => url('media/avatars/'.$user['avatar']),
+                ];
+            } 
+            return $array;
+
+        } else {
+            return['error'=> 'Usuário inexistente!'] ;
+        }
+        return['error' => ''];
+    }
 }
